@@ -2,7 +2,7 @@
 
 Official **FamGateway** payment gateway extension for **Paymenter** — India's leading 100% Free, Non-Custodial Automated UPI Payment Gateway.
 
-> **Developer Credits**: Developed by **taravspie**  
+> **Developer Credits**: Developed by **Aryanispe**  
 > **Merchant Dashboard**: [https://famgateway.in/dashboard.php](https://famgateway.in/dashboard.php)  
 > **Official Website**: [https://famgateway.in](https://famgateway.in)  
 
@@ -12,7 +12,7 @@ Accept automated UPI payments via **PhonePe, Google Pay, Paytm, CRED, FamPay, an
 
 ## ⚡ Features
 
-- **Developed by taravspie**: Complete, native Paymenter extension for zero-fee UPI collections.
+- **Developed by Aryanispe**: Complete, native Paymenter extension for zero-fee UPI collections.
 - **0% Transaction Fees (Free Forever)**: 100% peer-to-peer (P2P), non-custodial automated UPI collection.
 - **Instant Bank Settlement (0 Seconds)**: Funds go directly into your bank or FamPay account in real-time.
 - **No GST or Current Account Required**: Fully compliant with Section 22 of the CGST Act, 2017 (exemption for indie developers, students, and businesses under ₹20 Lakhs/year).
@@ -26,7 +26,7 @@ Accept automated UPI payments via **PhonePe, Google Pay, Paytm, CRED, FamPay, an
 
 ```text
 FamGateway/
-├── FamGateway.php               # Core Gateway Driver (by taravspie)
+├── FamGateway.php               # Core Gateway Driver (by Aryanispe)
 ├── routes/
 │   └── web.php                  # Webhook route registration
 ├── extension.json               # Extension metadata definition with developer credits
@@ -67,4 +67,4 @@ FamGateway/
 
 - **Merchant Dashboard**: [https://famgateway.in/dashboard.php](https://famgateway.in/dashboard.php)
 - **Developer Documentation**: [https://famgateway.in/docs.md](https://famgateway.in/docs.md)
-- **Developer**: taravspie
+- **Developer**: Aryanispe
