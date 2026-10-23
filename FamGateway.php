@@ -1,18 +1,25 @@
 <?php
 
-namespace App\Extensions\Gateways\FamGateway;
+namespace Paymenter\Extensions\Gateways\FamGateway;
 
-use App\Classes\Extension\Gateway;
+use GuzzleHttp\Client;
+use Illuminate\Http\Request;
 use App\Helpers\ExtensionHelper;
-use App\Models\Invoice;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Http;
+use App\Classes\Extension\Gateway;
 use Illuminate\Support\Facades\Log;
 
 class FamGateway extends Gateway
 {
     /**
-     * Get the extension metadata configuration fields.
+     * Boot the gateway extension and register its routes.
+     */
+    public function boot()
+    {
+        require __DIR__ . '/routes/web.php';
+    }
+
+    /**
+     * Define the configuration fields displayed in the Paymenter Admin Panel.
      *
      * @param array $values
      * @return array
@@ -22,136 +29,146 @@ class FamGateway extends Gateway
         return [
             [
                 'name' => 'api_key',
-                'friendly_name' => 'FamGateway API Key',
+                'label' => 'FamGateway API Key',
                 'type' => 'text',
-                'description' => 'Your merchant API Key from FamGateway Dashboard (e.g. fam_afc0da5b20f8...)',
                 'required' => true,
             ],
             [
                 'name' => 'currency_check',
-                'friendly_name' => 'Restrict Currency to INR',
-                'type' => 'boolean',
-                'description' => 'Enable to only allow checkout when the invoice currency is INR (FamGateway is 100% Indian UPI).',
-                'default' => true,
+                'label' => 'Restrict Currency to INR',
+                'type' => 'checkbox',
                 'required' => false,
             ],
-            [
-                'name' => 'custom_title',
-                'friendly_name' => 'Gateway Display Name',
-                'type' => 'text',
-                'description' => 'Display name shown to clients during checkout.',
-                'default' => 'UPI / FamPay / QR Code (Zero Fee)',
-                'required' => false,
-            ]
         ];
     }
 
     /**
-     * Determine if this payment gateway can be used for the current invoice.
+     * Process checkout for the invoice.
+     * Creates a dynamic UPI payment session via FamGateway and redirects to the hosted checkout page.
      *
+     * @param mixed $invoice
      * @param float $total
-     * @param string $currency
-     * @param string $type
-     * @param array $items
-     * @return bool
-     */
-    public function canUseGateway($total, $currency, $type, $items = [])
-    {
-        $restrictInr = $this->config('currency_check') ?? true;
-
-        if ($restrictInr && strtoupper($currency) !== 'INR') {
-            return false;
-        }
-
-        // FamGateway minimum payment is typically ₹1.00
-        if ($total < 1.00) {
-            return false;
-        }
-
-        return true;
-    }
-
-    /**
-     * Process checkout for the given invoice.
-     * Generates a dynamic UPI payment session on FamGateway and returns the checkout URL.
-     *
-     * @param Invoice $invoice
-     * @param float $total
-     * @return string
+     * @return \Illuminate\Http\RedirectResponse
      * @throws \Exception
      */
-    public function pay(Invoice $invoice, $total)
+    public function pay($invoice, $total)
     {
-        $apiKey = trim($this->config('api_key'));
-
-        if (empty($apiKey)) {
-            Log::error("[FamGateway] API key is missing in gateway configuration.");
-            throw new \Exception("FamGateway is not properly configured. Merchant API key is missing.");
+        $currency = $invoice->currency_code ?? $invoice->currency ?? 'INR';
+        if ($this->config('currency_check') && strtoupper($currency) !== 'INR') {
+            throw new \Exception('The invoice currency code must be "INR" to make payments via FamGateway UPI.');
         }
 
-        // Client and contact information
-        $user = $invoice->user;
-        $customerName = $user ? ($user->name ?? $user->first_name . ' ' . $user->last_name) : 'Customer';
-        $customerEmail = $user ? $user->email : 'billing@client.com';
-        $customerPhone = $user->phone ?? '9876543210';
+        $apiKey = trim($this->config('api_key'));
+        if (empty($apiKey)) {
+            throw new \Exception('FamGateway is not properly configured. Merchant API key is missing.');
+        }
 
-        // Clean amount to 2 decimal places
         $amount = number_format((float)$total, 2, '.', '');
+        $customerName = $invoice->user->name ?? 'Customer';
+        $customerEmail = $invoice->user->email ?? 'billing@customer.com';
+        
+        $customerPhone = '9876543210';
+        if (method_exists($invoice->user, 'properties') && $invoice->user->properties()->where('key', 'phone')->exists()) {
+            $customerPhone = $invoice->user->properties()->where('key', 'phone')->first()->value;
+        }
 
-        // Redirect URL after customer completes payment
-        $redirectUrl = route('clients.invoice.show', $invoice->id);
+        // Return URL when customer finishes payment
+        $returnUrl = route('invoices.show', ['invoice' => $invoice->id]);
 
-        // Webhook URL with invoice reference attached as query parameter for fail-safe reconciliation
-        $webhookUrl = url('/extensions/gateways/famgateway/webhook?invoice_id=' . $invoice->id);
+        // Webhook URL registered by this extension (includes invoice query param for instant mapping)
+        $webhookUrl = route('extensions.gateways.famgateway.webhook', ['invoice_id' => $invoice->id]);
 
         $payload = [
             'api_key' => $apiKey,
             'amount' => (float)$amount,
-            'redirect_url' => $redirectUrl,
+            'redirect_url' => $returnUrl,
             'webhook_url' => $webhookUrl,
             'customer_name' => substr($customerName, 0, 50),
             'customer_email' => $customerEmail,
             'customer_phone' => $customerPhone,
         ];
 
+        $client = new Client();
+
         try {
-            $response = Http::withHeaders([
-                'Content-Type' => 'application/json',
-                'X-Api-Key' => $apiKey,
-            ])->timeout(15)->post('https://famgateway.in/api/create-order', $payload);
+            $response = $client->post('https://famgateway.in/api/create-order', [
+                'headers' => [
+                    'Content-Type' => 'application/json',
+                    'X-Api-Key' => $apiKey,
+                ],
+                'json' => $payload,
+                'timeout' => 15,
+            ]);
 
-            if (!$response->successful()) {
-                Log::error("[FamGateway] Order creation HTTP error: " . $response->body());
-                throw new \Exception("FamGateway payment creation failed: " . $response->body());
+            $data = json_decode($response->getBody()->getContents(), true);
+
+            if (isset($data['status']) && $data['status'] === 'success' && !empty($data['data']['checkout_url'])) {
+                // Redirect user directly to FamGateway's zero-code hosted checkout with 10-min countdown timer & QR
+                return redirect()->away($data['data']['checkout_url']);
             }
 
-            $result = $response->json();
-
-            if (!isset($result['status']) || $result['status'] !== 'success' || empty($result['data']['checkout_url'])) {
-                $errorMsg = $result['message'] ?? 'Unknown error from FamGateway API';
-                Log::error("[FamGateway] API returned error: " . json_encode($result));
-                throw new \Exception("Failed to generate UPI payment session: " . $errorMsg);
-            }
-
-            $orderData = $result['data'];
-            $orderId = $orderData['order_id'];
-            $checkoutUrl = $orderData['checkout_url'];
-
-            // Store order mapping in cache for 2 hours for webhook verification
-            Cache::put('famgateway_order_' . $orderId, [
-                'invoice_id' => $invoice->id,
-                'amount' => $amount,
-                'created_at' => now(),
-            ], now()->addHours(2));
-
-            Log::info("[FamGateway] Payment session generated: Order ID {$orderId} for Invoice #{$invoice->id} (Amount: ₹{$amount})");
-
-            // Return FamGateway's zero-code hosted checkout URL (Paymenter redirects user here)
-            return $checkoutUrl;
+            $errorMessage = $data['message'] ?? 'Unable to generate dynamic UPI QR code.';
+            throw new \Exception('FamGateway error: ' . $errorMessage);
 
         } catch (\Exception $e) {
-            Log::error("[FamGateway] Exception during payment initialization: " . $e->getMessage());
-            throw $e;
+            Log::error('[FamGateway] Order creation error: ' . $e->getMessage());
+            throw new \Exception('Failed to initialize FamGateway payment: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Handle incoming asynchronous webhook from FamGateway with timing-safe HMAC-SHA256 verification.
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\Response
+     */
+    public function webhook(Request $request)
+    {
+        $rawBody = $request->getContent();
+        $signature = $request->header('x-famgateway-signature') ?? $request->header('X-FamGateway-Signature');
+
+        if (empty($signature)) {
+            Log::warning('[FamGateway Webhook] Missing signature header');
+            return response('Missing signature header', 401);
+        }
+
+        $apiKey = trim($this->config('api_key'));
+        if (empty($apiKey)) {
+            Log::critical('[FamGateway Webhook] API Key not configured');
+            return response('Gateway not configured', 500);
+        }
+
+        // Timing-Safe HMAC-SHA256 Cryptographic Check
+        $expectedSignature = hash_hmac('sha256', $rawBody, $apiKey);
+        if (!hash_equals($expectedSignature, $signature)) {
+            Log::warning('[FamGateway Webhook] Signature verification failed');
+            return response('Signature verification failed', 401);
+        }
+
+        $data = json_decode($rawBody, true);
+        if (!$data || !is_array($data)) {
+            return response('Invalid JSON payload', 400);
+        }
+
+        if (($data['event'] ?? '') === 'payment.success') {
+            $orderId = $data['order_id'] ?? null;
+            $amount  = (float)($data['amount'] ?? 0);
+            $utr     = $data['utr'] ?? $orderId;
+            $invoiceId = (int)($request->query('invoice_id') ?? 0);
+
+            if ($invoiceId > 0) {
+                // Settle invoice using Paymenter's official ExtensionHelper
+                if (method_exists(ExtensionHelper::class, 'addPayment')) {
+                    ExtensionHelper::addPayment($invoiceId, 'FamGateway', $amount, null, $utr);
+                } elseif (method_exists(ExtensionHelper::class, 'paymentDone')) {
+                    ExtensionHelper::paymentDone($invoiceId, 'FamGateway', $utr);
+                }
+
+                Log::info("[FamGateway Webhook] Payment confirmed! Invoice #{$invoiceId} settled. UTR: {$utr}, Amount: ₹{$amount}");
+                return response('Webhook received and processed successfully', 200);
+            }
+        }
+
+        return response('Webhook processed', 200);
     }
 }
