@@ -2,12 +2,17 @@
 
 Official **FamGateway** payment gateway extension for **Paymenter** — India's leading 100% Free, Non-Custodial Automated UPI Payment Gateway.
 
+> **Developer Credits**: Developed by **taravspie**  
+> **Merchant Dashboard**: [https://famgateway.in/dashboard.php](https://famgateway.in/dashboard.php)  
+> **Official Website**: [https://famgateway.in](https://famgateway.in)  
+
 Accept automated UPI payments via **PhonePe, Google Pay, Paytm, CRED, FamPay, and BHIM** with **0.0% transaction fees** and direct P2P instant bank settlement to your account.
 
 ---
 
 ## ⚡ Features
 
+- **Developed by taravspie**: Complete, native Paymenter extension for zero-fee UPI collections.
 - **0% Transaction Fees (Free Forever)**: 100% peer-to-peer (P2P), non-custodial automated UPI collection.
 - **Instant Bank Settlement (0 Seconds)**: Funds go directly into your bank or FamPay account in real-time.
 - **No GST or Current Account Required**: Fully compliant with Section 22 of the CGST Act, 2017 (exemption for indie developers, students, and businesses under ₹20 Lakhs/year).
@@ -21,87 +26,45 @@ Accept automated UPI payments via **PhonePe, Google Pay, Paytm, CRED, FamPay, an
 
 ```text
 FamGateway/
-├── FamGateway.php               # Core Gateway Driver (implements getConfig, canUseGateway, pay)
-├── routes.php                   # Webhook & client return routes
-├── extension.json               # Extension metadata definition
-├── Controllers/
-│   └── FamGatewayController.php # HMAC-SHA256 signature verification & invoice fulfillment
+├── FamGateway.php               # Core Gateway Driver (by taravspie)
+├── routes/
+│   └── web.php                  # Webhook route registration
+├── extension.json               # Extension metadata definition with developer credits
 └── README.md                    # Installation and configuration guide
 ```
 
 ---
 
-## 🚀 Installation Guide
+## 🚀 Installation on Your VPS
 
-### Step 1: Copy Extension into Paymenter
-
-Upload or copy the `FamGateway` directory into your Paymenter installation:
-
-#### For Paymenter v0 (Standard):
-```bash
-cp -r FamGateway /var/www/paymenter/app/Extensions/Gateways/
-```
-
-#### For Paymenter v1:
-```bash
-cp -r FamGateway /var/www/paymenter/extensions/Gateways/
-```
-
-### Step 2: Set Proper File Permissions
-
-Ensure your web server user (`www-data` or `nginx`) owns the files:
-```bash
-chown -R www-data:www-data /var/www/paymenter/app/Extensions/Gateways/FamGateway
-chmod -R 755 /var/www/paymenter/app/Extensions/Gateways/FamGateway
-```
-
-### Step 3: Clear Laravel Cache
-
-```bash
-cd /var/www/paymenter
-php artisan route:clear
-php artisan config:clear
-php artisan cache:clear
-```
-
----
-
-## ⚙️ Configuration in Admin Panel
-
-1. Log in to your **Paymenter Admin Panel**.
-2. Navigate to **Extensions** ➜ **Gateways** (or **Settings** ➜ **Payments**).
-3. Find **FamGateway** and click **Enable / Install**.
-4. Configure the settings:
-   - **FamGateway API Key**: Paste your secret API key from the [FamGateway Merchant Dashboard](https://famgateway.in/dashboard) (e.g. `fam_afc0da5b20f89df571d7c758a0e1fb5a3d11df94`).
-   - **Restrict Currency to INR**: Set to `true` (Enabled) since FamGateway processes Indian UPI payments.
-   - **Gateway Display Name**: `UPI / FamPay / QR Code (Zero Fee)`
-5. Click **Save Settings**.
-
----
-
-## 🔗 Configure Webhook in FamGateway
-
-1. Go to your [FamGateway Merchant Dashboard](https://famgateway.in/dashboard).
-2. Set your default **Webhook URL** to:
-   ```text
-   https://your-paymenter-domain.com/extensions/gateways/famgateway/webhook
+1. Clone directly into Paymenter's gateways directory:
+   ```bash
+   cd /var/www/paymenter/extensions/Gateways
+   git clone https://github.com/akashdevme/FamGateway.git FamGateway
+   chown -R www-data:www-data FamGateway
+   chmod -R 755 FamGateway
    ```
-   *(Note: The extension also dynamically injects the `webhook_url` and `invoice_id` with each order for 100% fail-safe multi-invoice reconciliation).*
 
----
+2. Clear Laravel cache:
+   ```bash
+   cd /var/www/paymenter
+   php artisan route:clear
+   php artisan config:clear
+   php artisan cache:clear
+   ```
 
-## 🔒 Security Architecture
-
-1. **HMAC-SHA256 Webhook Verification**: Every incoming webhook payload is verified using `hash_equals(hash_hmac('sha256', $rawBody, $apiKey), $signature)` to ensure requests originate exclusively from FamGateway.
-2. **CSRF Exemption**: Webhook route is safely excluded from Laravel's CSRF token verification without compromising other routes.
-3. **Idempotent Settlement**: Prevents duplicate provisioning or billing race conditions.
+3. Enable in Admin Dashboard:
+   - Go to **Admin** ➜ **Extensions** ➜ **Gateways** ➜ **FamGateway**.
+   - Enter your API Key from [FamGateway Dashboard](https://famgateway.in/dashboard.php).
+   - Set the Webhook URL in your FamGateway dashboard to:
+     ```text
+     https://your-domain.com/extensions/gateways/famgateway/webhook
+     ```
 
 ---
 
 ## 📞 Support & Community
 
-- **Official Website**: [https://famgateway.in](https://famgateway.in)
+- **Merchant Dashboard**: [https://famgateway.in/dashboard.php](https://famgateway.in/dashboard.php)
 - **Developer Documentation**: [https://famgateway.in/docs.md](https://famgateway.in/docs.md)
-- **Live Status**: [https://famgateway.in/status.php](https://famgateway.in/status.php)
-- **Telegram Developer Community**: [https://t.me/aryanispe_related](https://t.me/aryanispe_related)
-- **WhatsApp Direct Support**: [+91 97713 48544](https://wa.me/919771348544)
+- **Developer**: taravspie

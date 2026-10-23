@@ -8,6 +8,14 @@ use App\Helpers\ExtensionHelper;
 use App\Classes\Extension\Gateway;
 use Illuminate\Support\Facades\Log;
 
+/**
+ * FamGateway Payment Extension for Paymenter
+ * 
+ * India's 100% Free, Zero-Fee, Non-Custodial Automated UPI Payment Gateway.
+ * 
+ * @author taravspie
+ * @link https://famgateway.in/dashboard.php
+ */
 class FamGateway extends Gateway
 {
     /**
@@ -31,12 +39,14 @@ class FamGateway extends Gateway
                 'name' => 'api_key',
                 'label' => 'FamGateway API Key',
                 'type' => 'text',
+                'description' => 'Enter your API key from the FamGateway Dashboard (https://famgateway.in/dashboard.php). Developed by taravspie.',
                 'required' => true,
             ],
             [
                 'name' => 'currency_check',
                 'label' => 'Restrict Currency to INR',
                 'type' => 'checkbox',
+                'description' => 'Only allow checkout when invoice currency is INR. FamGateway is a zero-fee Indian UPI gateway.',
                 'required' => false,
             ],
         ];
@@ -60,7 +70,7 @@ class FamGateway extends Gateway
 
         $apiKey = trim($this->config('api_key'));
         if (empty($apiKey)) {
-            throw new \Exception('FamGateway is not properly configured. Merchant API key is missing.');
+            throw new \Exception('FamGateway is not properly configured. Merchant API key is missing. Get your key at https://famgateway.in/dashboard.php');
         }
 
         $amount = number_format((float)$total, 2, '.', '');
