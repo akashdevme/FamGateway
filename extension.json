@@ -1,0 +1,12 @@
+{
+    "name": "FamGateway",
+    "display_name": "FamGateway UPI (Zero Fee)",
+    "version": "1.0.0",
+    "type": "gateway",
+    "namespace": "App\\Extensions\\Gateways\\FamGateway\\FamGateway",
+    "author": "FamGateway / ARYANISPE",
+    "description": "India's leading 100% Free, Non-Custodial Automated UPI Payment Gateway for Paymenter. Accept zero-fee P2P UPI payments via PhonePe, GPay, Paytm, CRED & FamPay with instant invoice settlement.",
+    "website": "https://famgateway.in",
+    "documentation": "https://famgateway.in/docs.md",
+    "icon": "https://famgateway.in/assets/img/logo.png"
+}
